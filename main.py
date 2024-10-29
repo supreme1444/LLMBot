@@ -1,16 +1,19 @@
+
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import sqlite3
 import numpy as np
-from openai import OpenAI
 from sklearn.cluster import KMeans
 import spacy
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
 
 # Загрузка модели для обработки естественного языка
 nlp = spacy.load("ru_core_news_sm")
 
 # Инициализация OpenAI клиента
-client = OpenAI(
+client = ChatOpenAI(
     api_key="sk-KMHrRUpHbijEdt5ViGuRWt4uVQMUHFVy",
     base_url="https://api.proxyapi.ru/openai/v1",
 )
@@ -35,7 +38,7 @@ CREATE TABLE IF NOT EXISTS messages (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 )''')
 conn.commit()
-
+history = []
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет. Чем могу помочь?")
 
@@ -62,21 +65,32 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = process_intent(intent, user_id)
         await update.message.reply_text(response)
     else:
-        chat_completion = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": message}]
-        )
-        reply = chat_completion.choices[0].message.content
-        await update.message.reply_text(reply)
+        # Создание шаблона подсказки
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "Вы — высококлассный технический писатель."),
+            ("user", "{input}")
+        ])
+        # Создание цепочки
+        chain = prompt | client | StrOutputParser()
+        # Хранение истории сообщений
+        history.append({"role": "user", "content": message})
+        context_input = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history])
+        response = chain.invoke({"input": context_input})
+        # Добавление ответа бота в историю
+        history.append({"role": "bot", "content": response})
+
+        response
+        await update.message.reply_text(response)
 
 
 def handle_message_enter(message):
     intents = {
-        "last_conversation": ["последний ", "разговор", "предыдущее", "сообщение", "общение", "диалог", "о чем"],
+        "last_conversation": ["последний разговор", "предыдущее сообщения", "общение", " все диалоги"],
         "user_list": ["список пользователей", "ник", "кто", "со мной", "общались с тобой", "юзер, ", "все кто"],
-        "frequent_questions": ["часто", "задаваемые", "вопросы", "часто спрашивают", "что чаще", "что спрашивают",
+        "frequent_questions": ["часто", "задаваемые", "частые вопросы", "часто спрашивают", "что чаще", "что чаще спрашивают",
                                "что задают", "самый частый", ],
-        "censorship": ["censorship_bot"]
+        "censorship": ["censorship_bot"],
+        "rat_bot": ["другие","другие пользователи","запросы других","других юзеров","вопросы других","о чем","диалоги других"]
     }
 
     doc = nlp(message.lower())
@@ -113,7 +127,7 @@ def process_intent(intent, user_id):
         ''')
         messages_avr = cursor.fetchall()
         vectors = np.array([nlp(message[0]).vector for message in messages_avr])
-        kmeans = KMeans(n_clusters=5)
+        kmeans = KMeans(n_clusters=10)
         kmeans.fit(vectors)
         labels, counts = np.unique(kmeans.labels_, return_counts=True)
         popular_cluster_index = labels[np.argmax(counts)]
@@ -137,7 +151,14 @@ def process_intent(intent, user_id):
                 return f"Найденные id пользователей: {', '.join(map(str, matching_user_ids))}"
             else:
                 return "Совпадений не найдено."
-
+    elif intent == "rat_bot":
+        cursor.execute('SELECT user_id, message FROM messages WHERE user_id != ? ORDER BY id DESC', (user_id,))
+        messages = cursor.fetchall()
+        if messages:
+            conversation1 = "\n".join([f"Пользователь {msg[0]}: {msg[1]}" for msg in messages if msg[1] is not None])
+            return f"Сообщения других пользователей:\n{conversation1}"
+        else:
+            return "Нет сообщений от других пользователей."
     return "Извините, я не понимаю ваш запрос."
 
 
