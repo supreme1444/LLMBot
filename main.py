@@ -6,20 +6,27 @@ from openai import OpenAI
 from sklearn.cluster import KMeans
 import spacy
 
+# Загрузка модели для обработки естественного языка
 nlp = spacy.load("ru_core_news_sm")
-reply = "Извините, я не понимаю ваш запрос."
+
+# Инициализация OpenAI клиента
 client = OpenAI(
     api_key="sk-KMHrRUpHbijEdt5ViGuRWt4uVQMUHFVy",
     base_url="https://api.proxyapi.ru/openai/v1",
 )
+
+# Подключение к базе данных SQLite
 conn = sqlite3.connect("al.db")
 cursor = conn.cursor()
+
+# Создание таблиц, если они не существуют
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS users (
     user_id INTEGER PRIMARY KEY,
     username TEXT
 )''')
 conn.commit()
+
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,37 +36,35 @@ CREATE TABLE IF NOT EXISTS messages (
 )''')
 conn.commit()
 
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет. Чем могу помочь?")
-
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     username = update.message.from_user.username
     message = update.message.text
+
+    # Сохранение пользователя в базе данных
     cursor.execute('''
-        INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)
-        ''', (user_id, username))
+    INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)
+    ''', (user_id, username))
     conn.commit()
+
+    # Сохранение сообщения в базе данных
     cursor.execute('''
-        INSERT INTO messages (user_id, message) VALUES (?, ?)
-        ''', (user_id, message))
+    INSERT INTO messages (user_id, message) VALUES (?, ?)
+    ''', (user_id, message))
     conn.commit()
+
+    # Обработка сообщения
     intent = handle_message_enter(message)
     if intent is not None:
         response = process_intent(intent, user_id)
         await update.message.reply_text(response)
     else:
-        cursor.execute('''
-                SELECT message FROM messages WHERE user_id = ? ORDER BY ROWID DESC LIMIT 5
-            ''', (user_id,))
-        messages = cursor.fetchall()
-        messages_for_llm = [{"role": "user", "content": msg[0]} for msg in messages]
-
         chat_completion = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=messages_for_llm
+            messages=[{"role": "user", "content": message}]
         )
         reply = chat_completion.choices[0].message.content
         await update.message.reply_text(reply)
