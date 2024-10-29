@@ -52,6 +52,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Добавление ответа бота в историю
         history.append({"role": "bot", "content": response})
         await update.message.reply_text(response)  # Ответ пользователю
+        
 
 # Функция для обработки входящего сообщения и определения его намерения
 def handle_message_enter(message):
@@ -71,6 +72,7 @@ def handle_message_enter(message):
         if any(keyword in doc.text for keyword in keywords):
             return intent
     return None  # Если намерение не найдено
+    
 
 # Функция для обработки намерения и формирования ответа
 def process_intent(intent, user_id):
