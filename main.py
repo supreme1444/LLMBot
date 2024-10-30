@@ -1,7 +1,6 @@
 from sqlalchemy import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from langchain_openai import ChatOpenAI
-
 from app.app import message_handler
 
 # Инициализация клиента OpenAI с заданным API ключом и URL
