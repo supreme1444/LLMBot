@@ -6,12 +6,13 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from telegram.ext import ContextTypes
 
-from app.base import cursor, conn
+from app.database import cursor, conn
 
 # Загрузка модели для обработки естественного языка (NLP)
 nlp = spacy.load("ru_core_news_sm")
 
 history = []
+
 
 # Обработчик входящих сообщений
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,13 +53,13 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Добавление ответа бота в историю
         history.append({"role": "bot", "content": response})
         await update.message.reply_text(response)  # Ответ пользователю
-        
+
 
 # Функция для обработки входящего сообщения и определения его намерения
 def handle_message_enter(message):
     intents = {
         "last_conversation": ["последний разговор", "предыдущие сообщения", "последнее общение", "все диалоги", "мои последнии сообщения"],
-        "user_list": ["список пользователей", "ник", "кто", "со мной", "общались с тобой", " все юзеры, ", "все кто"],
+        "user_list": ["список пользователей", "со мной", "общались с тобой", "все юзеры, ", "все кто", "кто с тобой общался?", "еще общался"],
         "frequent_questions": ["часто", "задаваемые", "частые вопросы", "часто спрашивают", "что чаще", "что чаще спрашивают",
                                "что задают", "самый частый","чаще всего задают"],
         "censorship": ["censorship_bot"],
@@ -72,7 +73,7 @@ def handle_message_enter(message):
         if any(keyword in doc.text for keyword in keywords):
             return intent
     return None  # Если намерение не найдено
-    
+
 
 # Функция для обработки намерения и формирования ответа
 def process_intent(intent, user_id):
