@@ -5,12 +5,9 @@ from telegram import Update
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from telegram.ext import ContextTypes
-
 from app.database import cursor, conn
-
-# Загрузка модели для обработки естественного языка (NLP)
+# Загрузка модели для обработки языка (NLP)
 nlp = spacy.load("ru_core_news_sm")
-
 history = []
 
 
@@ -65,9 +62,7 @@ def handle_message_enter(message):
         "censorship": ["censorship_bot"],
         "request_oder_users": ["другие", "другие пользователи", "запросы других", "других юзеров", "вопросы других", "о чем", "диалоги других"]
     }
-
     doc = nlp(message.lower())  # Обработка сообщения с помощью NLP
-
     # Проверка, соответствует ли сообщение какому-либо намерению
     for intent, keywords in intents.items():
         if any(keyword in doc.text for keyword in keywords):
@@ -95,7 +90,6 @@ def process_intent(intent, user_id):
             return f"Список пользователей: {user_list}"
         else:
             return "Пользователей нет."
-
     elif intent == "frequent_questions":
         cursor.execute('''
             SELECT message FROM messages ORDER BY id DESC
