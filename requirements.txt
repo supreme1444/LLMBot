@@ -1,0 +1,7 @@
+spacy
+numpy
+scikit-learn
+python-telegram-bot
+langchain-core
+langchain-openai
+python-dotenv
